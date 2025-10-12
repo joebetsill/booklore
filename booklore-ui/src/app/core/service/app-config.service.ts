@@ -360,6 +360,7 @@ export class AppConfigService {
     return {
       preset: 'Aura',
       primary: 'green',
+      secondary: 'blue',
       surface: 'neutral',
     };
   }
@@ -377,13 +378,16 @@ export class AppConfigService {
   getPresetExt(): object {
     const surfacePalette = this.getSurfacePalette(this.appState().surface ?? 'neutral');
     const primaryName = this.appState().primary ?? 'green';
+    const secondaryName = this.appState().secondary ?? 'blue';
     const presetPalette = (Aura.primitive ?? {}) as Record<string, ColorPalette>;
-    const color = presetPalette[primaryName] ?? {};
+    const primaryColor = presetPalette[primaryName] ?? {};
+    const secondaryColor = presetPalette[secondaryName] ?? {};
 
     if (primaryName === 'noir') {
       return {
         semantic: {
           primary: {...surfacePalette},
+          secondary: secondaryColor,
           colorScheme: {
             dark: {
               primary: {
@@ -391,6 +395,12 @@ export class AppConfigService {
                 contrastColor: '{primary.950}',
                 hoverColor: '{primary.200}',
                 activeColor: '{primary.300}'
+              },
+              secondary: {
+                color: '{secondary.400}',
+                contrastColor: '{surface.900}',
+                hoverColor: '{secondary.300}',
+                activeColor: '{secondary.200}'
               },
               highlight: {
                 background: '{primary.50}',
@@ -406,7 +416,8 @@ export class AppConfigService {
 
     return {
       semantic: {
-        primary: color,
+        primary: primaryColor,
+        secondary: secondaryColor,
         colorScheme: {
           dark: {
             primary: {
@@ -414,6 +425,12 @@ export class AppConfigService {
               contrastColor: '{surface.900}',
               hoverColor: '{primary.300}',
               activeColor: '{primary.200}'
+            },
+            secondary: {
+              color: '{secondary.400}',
+              contrastColor: '{surface.900}',
+              hoverColor: '{secondary.300}',
+              activeColor: '{secondary.200}'
             },
             highlight: {
               background: 'color-mix(in srgb, {primary.400}, transparent 84%)',

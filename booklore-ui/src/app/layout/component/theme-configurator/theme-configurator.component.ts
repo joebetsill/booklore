@@ -39,6 +39,7 @@ export class ThemeConfiguratorComponent {
   readonly surfaces = this.configService.surfaces;
 
   readonly selectedPrimaryColor = computed(() => this.configService.appState().primary);
+  readonly selectedSecondaryColor = computed(() => this.configService.appState().secondary);
   readonly selectedSurfaceColor = computed(() => this.configService.appState().surface);
 
   readonly faviconColor = computed(() => {
@@ -71,7 +72,7 @@ export class ThemeConfiguratorComponent {
     );
   });
 
-  updateColors(event: Event, type: 'primary' | 'surface', color: { name: string; palette?: ColorPalette }) {
+  updateColors(event: Event, type: 'primary' | 'secondary' | 'surface', color: { name: string; palette?: ColorPalette }) {
     this.configService.appState.update((state) => ({
       ...state,
       [type]: color.name

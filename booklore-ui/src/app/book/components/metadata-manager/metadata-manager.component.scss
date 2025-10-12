@@ -146,7 +146,7 @@
   margin: 0 0 0.75rem 0;
 
   .pi {
-    color: var(--p-primary-color);
+    color: var(--primary-color);
     font-size: 1.25rem;
   }
 }
@@ -256,7 +256,7 @@
   transition: color 0.2s;
 
   &:hover {
-    color: var(--p-primary-color);
+    color: var(--primary-color);
     text-decoration: underline;
   }
 }
@@ -363,7 +363,7 @@
         color: var(--p-text-color);
 
         strong {
-          color: var(--p-primary-color);
+          color: var(--primary-color);
         }
       }
     }
@@ -398,7 +398,7 @@
 
     strong {
       font-size: 1.1rem;
-      color: var(--p-primary-color);
+      color: var(--primary-color);
     }
 
     .count {

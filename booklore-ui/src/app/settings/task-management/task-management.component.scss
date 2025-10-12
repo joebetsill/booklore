@@ -31,7 +31,7 @@
   margin: 0 0 0.75rem 0;
 
   .pi {
-    color: var(--p-primary-color);
+    color: var(--primary-color);
     font-size: 1.25rem;
   }
 }
@@ -82,7 +82,7 @@
   margin: 0;
 
   .pi {
-    color: var(--p-primary-color);
+    color: var(--primary-color);
   }
 }
 
@@ -178,7 +178,7 @@
     }
 
     .pi {
-      color: var(--p-primary-color);
+      color: var(--primary-color);
       margin-top: 0.125rem;
       flex-shrink: 0;
     }
@@ -384,13 +384,13 @@
         margin-top: 0.5rem;
 
         .pi {
-          color: var(--p-primary-color);
+          color: var(--primary-color);
           font-size: 1rem;
         }
 
         .cache-size-value {
           font-size: 1rem;
-          color: var(--p-primary-color);
+          color: var(--primary-color);
           font-weight: 600;
         }
       }
@@ -423,7 +423,7 @@
 
   .pi-spinner {
     font-size: 1.25rem;
-    color: var(--p-primary-color);
+    color: var(--primary-color);
   }
 }
 

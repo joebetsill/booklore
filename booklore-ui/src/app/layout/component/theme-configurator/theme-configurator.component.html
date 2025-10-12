@@ -16,6 +16,21 @@
   </div>
 
   <div class="config-panel-colors">
+    <span class="config-panel-label">Secondary</span>
+    <div>
+      @for (secondaryColor of primaryColors(); track secondaryColor.name) {
+        <button
+          type="button"
+          [title]="secondaryColor.name"
+          (click)="updateColors($event, 'secondary', secondaryColor)"
+          [ngClass]="{ 'active-color': secondaryColor.name === selectedSecondaryColor() }"
+          [style]="{ 'background-color': secondaryColor.name === 'noir' ? 'var(--text-color)' : secondaryColor.palette['500'] || 'transparent' }"
+        ></button>
+      }
+    </div>
+  </div>
+
+  <div class="config-panel-colors">
     <span class="config-panel-label">Surface</span>
     <div>
       @for (surface of surfaces; track surface.name) {
