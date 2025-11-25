@@ -1,43 +1,43 @@
-import {Component, DestroyRef, inject, Input, OnChanges, OnInit, SimpleChanges, ViewChild} from '@angular/core';
-import {Button} from 'primeng/button';
-import {AsyncPipe, DecimalPipe, NgClass, UpperCasePipe} from '@angular/common';
-import {Observable} from 'rxjs';
-import {BookService} from '../../../../book/service/book.service';
-import {Rating, RatingRateEvent} from 'primeng/rating';
-import {FormsModule} from '@angular/forms';
-import {Book, BookMetadata, BookRecommendation, FileInfo, ReadStatus} from '../../../../book/model/book.model';
-import {UrlHelperService} from '../../../../../shared/service/url-helper.service';
-import {UserService} from '../../../../settings/user-management/user.service';
-import {SplitButton} from 'primeng/splitbutton';
-import {ConfirmationService, MenuItem, MessageService} from 'primeng/api';
-import {BookSenderComponent} from '../../../../book/components/book-sender/book-sender.component';
-import {DialogService, DynamicDialogRef} from 'primeng/dynamicdialog';
-import {EmailService} from '../../../../settings/email-v2/email.service';
-import {ShelfAssignerComponent} from '../../../../book/components/shelf-assigner/shelf-assigner.component';
-import {Tooltip} from 'primeng/tooltip';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {Editor} from 'primeng/editor';
-import {ProgressBar} from 'primeng/progressbar';
-import {MetadataRefreshType} from '../../../model/request/metadata-refresh-type.enum';
-import {Router} from '@angular/router';
-import {filter, map, switchMap, take, tap} from 'rxjs/operators';
-import {Menu} from 'primeng/menu';
-import {InfiniteScrollDirective} from 'ngx-infinite-scroll';
-import {BookCardLiteComponent} from '../../../../book/components/book-card-lite/book-card-lite-component';
-import {ResetProgressType, ResetProgressTypes} from '../../../../../shared/constants/reset-progress-type';
-import {DatePicker} from 'primeng/datepicker';
-import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
-import {BookReviewsComponent} from '../../../../book/components/book-reviews/book-reviews.component';
-import {ProgressSpinner} from 'primeng/progressspinner';
+import { Component, OnInit, OnChanges, Input, ViewChild, inject, DestroyRef, SimpleChanges } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { Book, BookRecommendation, BookMetadata, ReadStatus, FileInfo } from '../../../../book/model/book.model';
+import { BookService } from '../../../../book/service/book.service';
+import { UrlHelperService } from '../../../../../shared/service/url-helper.service';
+import { UserService } from '../../../../settings/user-management/user.service';
+import { Button } from 'primeng/button';
+import { AsyncPipe, NgClass, DecimalPipe, UpperCasePipe } from '@angular/common';
+import { Rating, RatingRateEvent } from 'primeng/rating';
+import { FormsModule } from '@angular/forms';
+import { SplitButton } from 'primeng/splitbutton';
+import { ConfirmationService, MenuItem, MessageService } from 'primeng/api';
+import { BookSenderComponent } from '../../../../book/components/book-sender/book-sender.component';
+import { DialogService, DynamicDialogRef } from 'primeng/dynamicdialog';
+import { EmailService } from '../../../../settings/email-v2/email.service';
+import { ShelfAssignerComponent } from '../../../../book/components/shelf-assigner/shelf-assigner.component';
+import { Tooltip } from 'primeng/tooltip';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Editor } from 'primeng/editor';
+import { ProgressBar } from 'primeng/progressbar';
+import { MetadataRefreshType } from '../../../model/request/metadata-refresh-type.enum';
+import { Router } from '@angular/router';
+import { filter, map, switchMap, take, tap } from 'rxjs/operators';
+import { Menu } from 'primeng/menu';
+import { InfiniteScrollDirective } from 'ngx-infinite-scroll';
+import { BookCardLiteComponent } from '../../../../book/components/book-card-lite/book-card-lite-component';
+import { ResetProgressType, ResetProgressTypes } from '../../../../../shared/constants/reset-progress-type';
+import { DatePicker } from 'primeng/datepicker';
+import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
+import { BookReviewsComponent } from '../../../../book/components/book-reviews/book-reviews.component';
+import { ProgressSpinner } from 'primeng/progressspinner';
 
-import {TieredMenu} from 'primeng/tieredmenu';
-import {AdditionalFileUploaderComponent} from '../../../../book/components/additional-file-uploader/additional-file-uploader.component';
-import {Image} from 'primeng/image';
-import {BookDialogHelperService} from '../../../../book/components/book-browser/BookDialogHelperService';
-import {TagColor, TagComponent} from '../../../../../shared/components/tag/tag.component';
-import {MetadataFetchOptionsComponent} from '../../metadata-options-dialog/metadata-fetch-options/metadata-fetch-options.component';
-import {BookNotesComponent} from '../../../../book/components/book-notes/book-notes-component';
-import {TaskHelperService} from '../../../../settings/task-management/task-helper.service';
+import { TieredMenu } from 'primeng/tieredmenu';
+import { AdditionalFileUploaderComponent } from '../../../../book/components/additional-file-uploader/additional-file-uploader.component';
+import { Image } from 'primeng/image';
+import { BookDialogHelperService } from '../../../../book/components/book-browser/BookDialogHelperService';
+import { TagColor, TagComponent } from '../../../../../shared/components/tag/tag.component';
+import { MetadataFetchOptionsComponent } from '../../metadata-options-dialog/metadata-fetch-options/metadata-fetch-options.component';
+import { BookNotesComponent } from '../../../../book/components/book-notes/book-notes-component';
+import { TaskHelperService } from '../../../../settings/task-management/task-helper.service';
 
 @Component({
   selector: 'app-metadata-viewer',
@@ -79,17 +79,18 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
   selectedReadStatus: ReadStatus = ReadStatus.UNREAD;
   isEditingDateFinished = false;
   editDateFinished: Date | null = null;
+  isOffline$: Observable<boolean> = of(false);
 
   readStatusOptions: { value: ReadStatus, label: string }[] = [
-    {value: ReadStatus.UNREAD, label: 'Unread'},
-    {value: ReadStatus.PAUSED, label: 'Paused'},
-    {value: ReadStatus.READING, label: 'Reading'},
-    {value: ReadStatus.RE_READING, label: 'Re-reading'},
-    {value: ReadStatus.READ, label: 'Read'},
-    {value: ReadStatus.PARTIALLY_READ, label: 'Partially Read'},
-    {value: ReadStatus.ABANDONED, label: 'Abandoned'},
-    {value: ReadStatus.WONT_READ, label: 'Won\'t Read'},
-    {value: ReadStatus.UNSET, label: 'Unset'},
+    { value: ReadStatus.UNREAD, label: 'Unread' },
+    { value: ReadStatus.PAUSED, label: 'Paused' },
+    { value: ReadStatus.READING, label: 'Reading' },
+    { value: ReadStatus.RE_READING, label: 'Re-reading' },
+    { value: ReadStatus.READ, label: 'Read' },
+    { value: ReadStatus.PARTIALLY_READ, label: 'Partially Read' },
+    { value: ReadStatus.ABANDONED, label: 'Abandoned' },
+    { value: ReadStatus.WONT_READ, label: 'Won\'t Read' },
+    { value: ReadStatus.UNSET, label: 'Unset' },
   ];
 
   ngOnInit(): void {
@@ -104,8 +105,8 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
               header: 'Send Book to Email',
               modal: true,
               closable: true,
-              style: {position: 'absolute', top: '20%'},
-              data: {bookId: metadata.bookId}
+              style: { position: 'absolute', top: '20%' },
+              data: { bookId: metadata.bookId }
             });
           }
         }
@@ -165,7 +166,7 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
         // Add separator if both types exist
         if (book.alternativeFormats && book.alternativeFormats.length > 0 &&
           book.supplementaryFiles && book.supplementaryFiles.length > 0) {
-          items.push({separator: true});
+          items.push({ separator: true });
         }
 
         // Add supplementary files
@@ -200,7 +201,7 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
                   position: 'absolute',
                   top: '10%',
                 },
-                data: {book}
+                data: { book }
               });
             },
           },
@@ -260,7 +261,7 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
           // Add separator if both types exist
           if (book.alternativeFormats && book.alternativeFormats.length > 0 &&
             book.supplementaryFiles && book.supplementaryFiles.length > 0) {
-            deleteFileItems.push({separator: true});
+            deleteFileItems.push({ separator: true });
           }
 
           // Add supplementary files
@@ -308,6 +309,7 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
           this.quillEditor.quill.root.innerHTML = metadata!.description;
         }
         this.selectedReadStatus = book.readStatus ?? ReadStatus.UNREAD;
+        this.isOffline$ = this.bookService.isBookOffline(book.id);
       });
   }
 
@@ -360,6 +362,35 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
 
   downloadAdditionalFile(book: Book, fileId: number) {
     this.bookService.downloadAdditionalFile(book, fileId);
+  }
+
+  toggleOffline(book: Book) {
+    this.bookService.isBookOffline(book.id).pipe(take(1)).subscribe(isOffline => {
+      if (isOffline) {
+        this.confirmationService.confirm({
+          message: 'Remove this book from offline storage?',
+          header: 'Remove Offline',
+          icon: 'pi pi-exclamation-triangle',
+          accept: () => {
+            this.bookService.removeOfflineBook(book.id).subscribe(() => {
+              this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Book removed from offline storage' });
+              this.isOffline$ = this.bookService.isBookOffline(book.id);
+            });
+          }
+        });
+      } else {
+        this.messageService.add({ severity: 'info', summary: 'Downloading', detail: 'Downloading book for offline access...' });
+        this.bookService.makeAvailableOffline(book).subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Book available offline' });
+            this.isOffline$ = this.bookService.isBookOffline(book.id);
+          },
+          error: () => {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to download book' });
+          }
+        });
+      }
+    });
   }
 
   deleteAdditionalFile(bookId: number, fileId: number, fileName: string) {
@@ -424,10 +455,10 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
       header: `Update Book's Shelves`,
       modal: true,
       closable: true,
-      contentStyle: {overflow: 'auto'},
+      contentStyle: { overflow: 'auto' },
       baseZIndex: 10,
-      style: {position: 'absolute', top: '15%'},
-      data: {book: this.bookService.getBookByIdFromState(bookId)}
+      style: { position: 'absolute', top: '15%' },
+      data: { book: this.bookService.getBookByIdFromState(bookId) }
     });
   }
 
@@ -495,12 +526,12 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
     });
   }
 
-  onPersonalRatingChange(book: Book, {value: personalRating}: RatingRateEvent): void {
+  onPersonalRatingChange(book: Book, { value: personalRating }: RatingRateEvent): void {
     if (!book?.metadata) return;
-    const updatedMetadata = {...book.metadata, personalRating};
+    const updatedMetadata = { ...book.metadata, personalRating };
     this.bookService.updateBookMetadata(book.id, {
       metadata: updatedMetadata,
-      clearFlags: {personalRating: false}
+      clearFlags: { personalRating: false }
     }, false).subscribe({
       next: () => {
         this.messageService.add({
@@ -522,10 +553,10 @@ export class MetadataViewerComponent implements OnInit, OnChanges {
 
   resetPersonalRating(book: Book): void {
     if (!book?.metadata) return;
-    const updatedMetadata = {...book.metadata, personalRating: null};
+    const updatedMetadata = { ...book.metadata, personalRating: null };
     this.bookService.updateBookMetadata(book.id, {
       metadata: updatedMetadata,
-      clearFlags: {personalRating: true}
+      clearFlags: { personalRating: true }
     }, false).subscribe({
       next: () => {
         this.messageService.add({

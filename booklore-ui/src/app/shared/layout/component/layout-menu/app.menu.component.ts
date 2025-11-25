@@ -1,18 +1,18 @@
-import {Component, inject, OnInit} from '@angular/core';
-import {AppMenuitemComponent} from './app.menuitem.component';
-import {AsyncPipe} from '@angular/common';
-import {MenuModule} from 'primeng/menu';
-import {LibraryService} from '../../../../features/book/service/library.service';
-import {Observable, of} from 'rxjs';
-import {filter, map} from 'rxjs/operators';
-import {ShelfService} from '../../../../features/book/service/shelf.service';
-import {BookService} from '../../../../features/book/service/book.service';
-import {LibraryShelfMenuService} from '../../../../features/book/service/library-shelf-menu.service';
-import {AppVersion, VersionService} from '../../../service/version.service';
-import {DialogService, DynamicDialogRef} from 'primeng/dynamicdialog';
-import {VersionChangelogDialogComponent} from './version-changelog-dialog/version-changelog-dialog.component';
-import {UserService} from '../../../../features/settings/user-management/user.service';
-import {MagicShelfService, MagicShelfState} from '../../../../features/magic-shelf/service/magic-shelf.service';
+import { Component, inject, OnInit } from '@angular/core';
+import { AppMenuitemComponent } from './app.menuitem.component';
+import { AsyncPipe } from '@angular/common';
+import { MenuModule } from 'primeng/menu';
+import { LibraryService } from '../../../../features/book/service/library.service';
+import { Observable, of } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
+import { ShelfService } from '../../../../features/book/service/shelf.service';
+import { BookService } from '../../../../features/book/service/book.service';
+import { LibraryShelfMenuService } from '../../../../features/book/service/library-shelf-menu.service';
+import { AppVersion, VersionService } from '../../../service/version.service';
+import { DialogService, DynamicDialogRef } from 'primeng/dynamicdialog';
+import { VersionChangelogDialogComponent } from './version-changelog-dialog/version-changelog-dialog.component';
+import { UserService } from '../../../../features/settings/user-management/user.service';
+import { MagicShelfService, MagicShelfState } from '../../../../features/magic-shelf/service/magic-shelf.service';
 
 @Component({
   selector: 'app-menu',
@@ -79,6 +79,11 @@ export class AppMenuComponent implements OnInit {
               icon: 'pi pi-fw pi-book',
               routerLink: ['/all-books'],
               bookCount$: of(bookState.books ? bookState.books.length : 0),
+            },
+            {
+              label: 'Offline Books',
+              icon: 'pi pi-fw pi-download',
+              routerLink: ['/offline-books']
             }
           ],
         },

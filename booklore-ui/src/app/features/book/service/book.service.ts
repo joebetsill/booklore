@@ -1,16 +1,16 @@
-import {inject, Injectable} from '@angular/core';
-import {BehaviorSubject, first, Observable, of, throwError} from 'rxjs';
-import {HttpClient, HttpParams} from '@angular/common/http';
-import {catchError, filter, map, tap, shareReplay, finalize, distinctUntilChanged} from 'rxjs/operators';
-import {Book, BookDeletionResponse, BookMetadata, BookRecommendation, BookSetting, BulkMetadataUpdateRequest, MetadataUpdateWrapper, ReadStatus, AdditionalFileType, AdditionalFile} from '../model/book.model';
-import {BookState} from '../model/state/book-state.model';
-import {API_CONFIG} from '../../../core/config/api-config';
-import {FetchMetadataRequest} from '../../metadata/model/request/fetch-metadata-request.model';
-import {MetadataRefreshRequest} from '../../metadata/model/request/metadata-refresh-request.model';
-import {MessageService} from 'primeng/api';
-import {ResetProgressType, ResetProgressTypes} from '../../../shared/constants/reset-progress-type';
-import {AuthService} from '../../../shared/service/auth.service';
-import {FileDownloadService} from '../../../shared/service/file-download.service';
+import { inject, Injectable } from '@angular/core';
+import { BehaviorSubject, first, Observable, of, throwError, from, firstValueFrom, forkJoin } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { catchError, filter, map, tap, shareReplay, finalize, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { Book, BookDeletionResponse, BookMetadata, BookRecommendation, BookSetting, BulkMetadataUpdateRequest, MetadataUpdateWrapper, ReadStatus, AdditionalFileType, AdditionalFile } from '../model/book.model';
+import { BookState } from '../model/state/book-state.model';
+import { API_CONFIG } from '../../../core/config/api-config';
+import { MessageService } from 'primeng/api';
+import { AuthService } from '../../../shared/service/auth.service';
+import { FileDownloadService } from '../../../shared/service/file-download.service';
+import { OfflineService } from '../../../core/service/offline.service';
+import { FetchMetadataRequest } from '../../metadata/model/request/fetch-metadata-request.model';
+import { ResetProgressType, ResetProgressTypes } from '../../../shared/constants/reset-progress-type';
 
 @Injectable({
   providedIn: 'root',
@@ -23,6 +23,7 @@ export class BookService {
   private messageService = inject(MessageService);
   private authService = inject(AuthService);
   private fileDownloadService = inject(FileDownloadService);
+  private offlineService = inject(OfflineService);
 
   private bookStateSubject = new BehaviorSubject<BookState>({
     books: null,
@@ -55,6 +56,34 @@ export class BookService {
         }
       }
     });
+
+    window.addEventListener('online', () => this.syncProgress());
+    this.syncProgress();
+  }
+
+  private syncProgress() {
+    if (!navigator.onLine) return;
+
+    this.offlineService.getUnsyncedProgress().pipe(
+      first(),
+      switchMap(progressList => {
+        if (progressList.length === 0) return of(void 0);
+
+        const syncTasks = progressList.map(p => {
+          return this.http.post<void>(`${this.url}/progress`, {
+            bookId: p.bookId,
+            ...p.progress
+          }).pipe(
+            switchMap(() => this.offlineService.markProgressAsSynced(p.bookId)),
+            catchError(err => {
+              console.error('Failed to sync progress for book', p.bookId, err);
+              return of(void 0);
+            })
+          );
+        });
+        return forkJoin(syncTasks);
+      })
+    ).subscribe();
   }
 
   bookState$ = this.bookStateSubject.asObservable().pipe(
@@ -143,12 +172,12 @@ export class BookService {
             currentBooks[index] = updatedBook;
           }
         });
-        this.bookStateSubject.next({...currentState, books: [...currentBooks]});
+        this.bookStateSubject.next({ ...currentState, books: [...currentBooks] });
         return updatedBooks;
       }),
       catchError(error => {
         const currentState = this.bookStateSubject.value;
-        this.bookStateSubject.next({...currentState, error: error.message});
+        this.bookStateSubject.next({ ...currentState, error: error.message });
         throw error;
       })
     );
@@ -158,7 +187,7 @@ export class BookService {
     const currentState = this.bookStateSubject.value;
     const currentBooks = currentState.books || [];
     const filteredBooks = currentBooks.filter(book => book.libraryId !== libraryId);
-    this.bookStateSubject.next({...currentState, books: filteredBooks});
+    this.bookStateSubject.next({ ...currentState, books: filteredBooks });
   }
 
   removeBooksFromShelf(shelfId: number): void {
@@ -168,7 +197,7 @@ export class BookService {
       ...book,
       shelves: book.shelves?.filter(shelf => shelf.id !== shelfId),
     }));
-    this.bookStateSubject.next({...currentState, books: updatedBooks});
+    this.bookStateSubject.next({ ...currentState, books: updatedBooks });
   }
 
   getBookSetting(bookId: number): Observable<BookSetting> {
@@ -183,9 +212,9 @@ export class BookService {
     const timestamp = new Date().toISOString();
     const currentState = this.bookStateSubject.value;
     const updatedBooks = (currentState.books || []).map(book =>
-      book.id === bookId ? {...book, lastReadTime: timestamp} : book
+      book.id === bookId ? { ...book, lastReadTime: timestamp } : book
     );
-    this.bookStateSubject.next({...currentState, books: updatedBooks});
+    this.bookStateSubject.next({ ...currentState, books: updatedBooks });
   }
 
   readBook(bookId: number, reader?: "ngx" | "streaming"): void {
@@ -218,22 +247,52 @@ export class BookService {
   }
 
   getFileContent(bookId: number): Observable<Blob> {
-    return this.http.get<Blob>(`${this.url}/${bookId}/content`, {responseType: 'blob' as 'json'});
+    return this.offlineService.getBookContent(bookId).pipe(
+      switchMap(content => {
+        if (content) {
+          return of(content);
+        }
+        return this.http.get<Blob>(`${this.url}/${bookId}/content`, { responseType: 'blob' as 'json' });
+      })
+    );
   }
 
   getBookByIdFromAPI(bookId: number, withDescription: boolean) {
-    return this.http.get<Book>(`${this.url}/${bookId}`, {
-      params: {
-        withDescription: withDescription.toString()
-      }
-    });
+    return this.offlineService.getOfflineBooks().pipe(
+      map(books => books.find(b => b.id === bookId)),
+      switchMap(offlineBook => {
+        if (offlineBook) {
+          return of(offlineBook);
+        }
+        return this.http.get<Book>(`${this.url}/${bookId}`, {
+          params: {
+            withDescription: withDescription.toString()
+          }
+        });
+      })
+    );
+  }
+
+  makeAvailableOffline(book: Book): Observable<void> {
+    return this.http.get(`${this.url}/${book.id}/content`, { responseType: 'blob' }).pipe(
+      switchMap(blob => this.offlineService.saveBook(book, blob)),
+      map(() => void 0)
+    );
+  }
+
+  removeOfflineBook(bookId: number): Observable<void> {
+    return this.offlineService.removeBook(bookId);
+  }
+
+  isBookOffline(bookId: number): Observable<boolean> {
+    return this.offlineService.isBookOffline(bookId);
   }
 
   deleteBooks(ids: Set<number>): Observable<BookDeletionResponse> {
     const idList = Array.from(ids);
     const params = new HttpParams().set('ids', idList.join(','));
 
-    return this.http.delete<BookDeletionResponse>(this.url, {params}).pipe(
+    return this.http.delete<BookDeletionResponse>(this.url, { params }).pipe(
       tap(response => {
         const currentState = this.bookStateSubject.value;
         const remainingBooks = (currentState.books || []).filter(
@@ -322,7 +381,7 @@ export class BookService {
         const currentState = this.bookStateSubject.value;
         const updatedBooks = (currentState.books || []).map(book => {
           if (book.id === bookId) {
-            const updatedBook = {...book};
+            const updatedBook = { ...book };
             if (fileType === AdditionalFileType.ALTERNATIVE_FORMAT) {
               updatedBook.alternativeFormats = [...(book.alternativeFormats || []), newFile];
             } else {
@@ -367,36 +426,78 @@ export class BookService {
   }
 
   savePdfProgress(bookId: number, page: number, percentage: number): Observable<void> {
-    const body = {
-      bookId: bookId,
+    const progressData = {
       pdfProgress: {
         page: page,
         percentage: percentage
       }
-    }
-    return this.http.post<void>(`${this.url}/progress`, body);
+    };
+
+    return this.offlineService.saveProgress(bookId, progressData).pipe(
+      switchMap(() => {
+        if (navigator.onLine) {
+          const body = {
+            bookId: bookId,
+            ...progressData
+          };
+          return this.http.post<void>(`${this.url}/progress`, body).pipe(
+            switchMap(() => this.offlineService.markProgressAsSynced(bookId)),
+            map(() => void 0)
+          );
+        }
+        return of(void 0);
+      })
+    );
   }
 
   saveEpubProgress(bookId: number, cfi: string, percentage: number): Observable<void> {
-    const body = {
-      bookId: bookId,
+    const progressData = {
       epubProgress: {
         cfi: cfi,
         percentage: percentage
       }
     };
-    return this.http.post<void>(`${this.url}/progress`, body);
+
+    return this.offlineService.saveProgress(bookId, progressData).pipe(
+      switchMap(() => {
+        if (navigator.onLine) {
+          const body = {
+            bookId: bookId,
+            ...progressData
+          };
+          return this.http.post<void>(`${this.url}/progress`, body).pipe(
+            switchMap(() => this.offlineService.markProgressAsSynced(bookId)),
+            map(() => void 0)
+          );
+        }
+        return of(void 0);
+      })
+    );
   }
 
   saveCbxProgress(bookId: number, page: number, percentage: number): Observable<void> {
-    const body = {
-      bookId: bookId,
+    const progressData = {
       cbxProgress: {
         page: page,
         percentage: percentage
       }
     };
-    return this.http.post<void>(`${this.url}/progress`, body);
+
+    return this.offlineService.saveProgress(bookId, progressData).pipe(
+      switchMap(() => {
+        if (navigator.onLine) {
+          const body = {
+            bookId: bookId,
+            ...progressData
+          };
+          return this.http.post<void>(`${this.url}/progress`, body).pipe(
+            switchMap(() => this.offlineService.markProgressAsSynced(bookId)),
+            map(() => void 0)
+          );
+        }
+        return of(void 0);
+      })
+    );
   }
 
   updateDateFinished(bookId: number, dateFinished: string | null): Observable<void> {
@@ -411,7 +512,7 @@ export class BookService {
         if (currentState.books) {
           const updatedBooks = currentState.books.map(book => {
             if (book.id === bookId) {
-              return {...book, dateFinished: dateFinished || undefined};
+              return { ...book, dateFinished: dateFinished || undefined };
             }
             return book;
           });
@@ -441,7 +542,7 @@ export class BookService {
 
   updateBookMetadata(bookId: number | undefined, wrapper: MetadataUpdateWrapper, mergeCategories: boolean): Observable<BookMetadata> {
     const params = new HttpParams().set('mergeCategories', mergeCategories.toString());
-    return this.http.put<BookMetadata>(`${this.url}/${bookId}/metadata`, wrapper, {params}).pipe(
+    return this.http.put<BookMetadata>(`${this.url}/${bookId}/metadata`, wrapper, { params }).pipe(
       map(updatedMetadata => {
         this.handleBookMetadataUpdate(bookId!, updatedMetadata);
         return updatedMetadata;
@@ -465,9 +566,9 @@ export class BookService {
         const currentState = this.bookStateSubject.value;
         const updatedBooks = (currentState.books || []).map(book => {
           const updatedMetadata = updatedMetadataList.find(meta => meta.bookId === book.id);
-          return updatedMetadata ? {...book, metadata: updatedMetadata} : book;
+          return updatedMetadata ? { ...book, metadata: updatedMetadata } : book;
         });
-        this.bookStateSubject.next({...currentState, books: updatedBooks});
+        this.bookStateSubject.next({ ...currentState, books: updatedBooks });
       }),
       map(() => void 0),
       catchError((error) => {
@@ -482,7 +583,7 @@ export class BookService {
 
   uploadCoverFromUrl(bookId: number, url: string): Observable<BookMetadata> {
     return this.http
-      .post<BookMetadata>(`${this.url}/${bookId}/metadata/cover/from-url`, {url})
+      .post<BookMetadata>(`${this.url}/${bookId}/metadata/cover/from-url`, { url })
       .pipe(
         tap(updatedMetadata =>
           this.handleBookMetadataUpdate(bookId, updatedMetadata)
@@ -492,7 +593,7 @@ export class BookService {
 
   getBookRecommendations(bookId: number, limit: number = 20): Observable<BookRecommendation[]> {
     return this.http.get<BookRecommendation[]>(`${this.url}/${bookId}/recommendations`, {
-      params: {limit: limit.toString()}
+      params: { limit: limit.toString() }
     });
   }
 
@@ -517,14 +618,14 @@ export class BookService {
   resetProgress(bookIds: number | number[], type: ResetProgressType): Observable<Book[]> {
     const ids = Array.isArray(bookIds) ? bookIds : [bookIds];
     const params = new HttpParams().set('type', ResetProgressTypes[type]);
-    return this.http.post<Book[]>(`${this.url}/reset-progress`, ids, {params}).pipe(
+    return this.http.post<Book[]>(`${this.url}/reset-progress`, ids, { params }).pipe(
       tap(updatedBooks => updatedBooks.forEach(book => this.handleBookUpdate(book)))
     );
   }
 
   updateBookReadStatus(bookIds: number | number[], status: ReadStatus): Observable<Book[]> {
     const ids = Array.isArray(bookIds) ? bookIds : [bookIds];
-    return this.http.put<Book[]>(`${this.url}/read-status`, {ids, status}).pipe(
+    return this.http.put<Book[]>(`${this.url}/read-status`, { ids, status }).pipe(
       tap(updatedBooks => {
         updatedBooks.forEach(updatedBook => this.handleBookUpdate(updatedBook));
       })
@@ -532,7 +633,7 @@ export class BookService {
   }
 
   consolidateMetadata(metadataType: 'authors' | 'categories' | 'moods' | 'tags' | 'series' | 'publishers' | 'languages', targetValues: string[], valuesToMerge: string[]): Observable<any> {
-    const payload = {metadataType, targetValues, valuesToMerge};
+    const payload = { metadataType, targetValues, valuesToMerge };
     return this.http.post(`${this.url}/metadata/manage/consolidate`, payload).pipe(
       tap(() => {
         this.refreshBooks();
@@ -541,7 +642,7 @@ export class BookService {
   }
 
   deleteMetadata(metadataType: 'authors' | 'categories' | 'moods' | 'tags' | 'series' | 'publishers' | 'languages', valuesToDelete: string[]): Observable<any> {
-    const payload = {metadataType, valuesToDelete};
+    const payload = { metadataType, valuesToDelete };
     return this.http.post(`${this.url}/metadata/manage/delete`, payload).pipe(
       tap(() => {
         this.refreshBooks();
@@ -561,13 +662,13 @@ export class BookService {
     } else {
       updatedBooks.push(book);
     }
-    this.bookStateSubject.next({...currentState, books: updatedBooks});
+    this.bookStateSubject.next({ ...currentState, books: updatedBooks });
   }
 
   handleRemovedBookIds(removedBookIds: number[]): void {
     const currentState = this.bookStateSubject.value;
     const filteredBooks = (currentState.books || []).filter(book => !removedBookIds.includes(book.id));
-    this.bookStateSubject.next({...currentState, books: filteredBooks});
+    this.bookStateSubject.next({ ...currentState, books: filteredBooks });
   }
 
   handleBookUpdate(updatedBook: Book) {
@@ -575,7 +676,7 @@ export class BookService {
     const updatedBooks = (currentState.books || []).map(book =>
       book.id === updatedBook.id ? updatedBook : book
     );
-    this.bookStateSubject.next({...currentState, books: updatedBooks});
+    this.bookStateSubject.next({ ...currentState, books: updatedBooks });
   }
 
   handleMultipleBookUpdates(updatedBooks: Book[]): void {
@@ -588,15 +689,15 @@ export class BookService {
       updatedMap.has(book.id) ? updatedMap.get(book.id)! : book
     );
 
-    this.bookStateSubject.next({...currentState, books: mergedBooks});
+    this.bookStateSubject.next({ ...currentState, books: mergedBooks });
   }
 
   handleBookMetadataUpdate(bookId: number, updatedMetadata: BookMetadata) {
     const currentState = this.bookStateSubject.value;
     const updatedBooks = (currentState.books || []).map(book => {
-      return book.id == bookId ? {...book, metadata: updatedMetadata} : book
+      return book.id == bookId ? { ...book, metadata: updatedMetadata } : book
     });
-    this.bookStateSubject.next({...currentState, books: updatedBooks})
+    this.bookStateSubject.next({ ...currentState, books: updatedBooks })
   }
 
   toggleFieldLocks(bookIds: number[] | Set<number>, fieldActions: Record<string, 'LOCK' | 'UNLOCK'>): Observable<void> {
@@ -612,7 +713,7 @@ export class BookService {
         const currentState = this.bookStateSubject.value;
         const updatedBooks = (currentState.books || []).map(book => {
           if (!bookIdSet.has(book.id)) return book;
-          const updatedMetadata = {...book.metadata};
+          const updatedMetadata = { ...book.metadata };
           for (const [field, action] of Object.entries(fieldActions)) {
             const lockField = field.endsWith('Locked') ? field : `${field}Locked`;
             if (lockField in updatedMetadata) {
