@@ -10,11 +10,11 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 
 @Component({
-    selector: 'app-offline-books',
-    standalone: true,
-    imports: [CommonModule, BookCardLiteComponent, ButtonModule, ConfirmDialogModule],
-    providers: [ConfirmationService],
-    template: `
+  selector: 'app-offline-books',
+  standalone: true,
+  imports: [CommonModule, BookCardLiteComponent, ButtonModule, ConfirmDialogModule],
+  providers: [ConfirmationService],
+  template: `
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Offline Books</h1>
@@ -29,7 +29,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" *ngIf="books$ | async as books">
         <div *ngFor="let book of books">
-            <app-book-card-lite [book]="book"></app-book-card-lite>
+            <app-book-card-lite-component [book]="book"></app-book-card-lite-component>
         </div>
         
         <div *ngIf="books.length === 0" class="col-span-full text-center py-12 text-gray-500">
@@ -42,37 +42,37 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
   `
 })
 export class OfflineBooksComponent implements OnInit {
-    private bookService = inject(BookService);
-    private offlineService = inject(OfflineService);
-    private confirmationService = inject(ConfirmationService);
-    private messageService = inject(MessageService);
+  private bookService = inject(BookService);
+  private offlineService = inject(OfflineService);
+  private confirmationService = inject(ConfirmationService);
+  private messageService = inject(MessageService);
 
-    books$!: Observable<Book[]>;
+  books$!: Observable<Book[]>;
 
-    ngOnInit() {
-        this.refreshBooks();
-    }
+  ngOnInit() {
+    this.refreshBooks();
+  }
 
-    refreshBooks() {
-        this.books$ = this.offlineService.getOfflineBooks();
-    }
+  refreshBooks() {
+    this.books$ = this.offlineService.getOfflineBooks();
+  }
 
-    removeAll() {
-        this.confirmationService.confirm({
-            message: 'Are you sure you want to remove all offline books? This cannot be undone.',
-            header: 'Confirm Removal',
-            icon: 'pi pi-exclamation-triangle',
-            accept: () => {
-                this.offlineService.clearAll().subscribe({
-                    next: () => {
-                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'All offline books removed' });
-                        this.refreshBooks();
-                    },
-                    error: () => {
-                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove offline books' });
-                    }
-                });
-            }
+  removeAll() {
+    this.confirmationService.confirm({
+      message: 'Are you sure you want to remove all offline books? This cannot be undone.',
+      header: 'Confirm Removal',
+      icon: 'pi pi-exclamation-triangle',
+      accept: () => {
+        this.offlineService.clearAll().subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'All offline books removed' });
+            this.refreshBooks();
+          },
+          error: () => {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove offline books' });
+          }
         });
-    }
+      }
+    });
+  }
 }

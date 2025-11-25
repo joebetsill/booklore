@@ -1,11 +1,12 @@
-import {inject, Injectable} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
-import {BehaviorSubject, Observable, throwError} from 'rxjs';
-import {API_CONFIG} from '../../../core/config/api-config';
-import {Library} from '../../book/model/library.model';
-import {catchError, distinctUntilChanged, finalize, shareReplay, tap} from 'rxjs/operators';
-import {AuthService} from '../../../shared/service/auth.service';
-import {DashboardConfig} from '../../dashboard/models/dashboard-config.model';
+
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+import { catchError, distinctUntilChanged, finalize, shareReplay, tap } from 'rxjs/operators';
+import { API_CONFIG } from '../../../core/config/api-config';
+import { AuthService } from '../../../shared/service/auth.service';
+import { Library } from '../../book/model/library.model';
+import { DashboardConfig } from '../../dashboard/models/dashboard-config.model';
 
 export interface EntityViewPreferences {
   global: EntityViewPreference;
@@ -184,7 +185,7 @@ export class UserService {
   constructor() {
     this.authService.token$.pipe(
       distinctUntilChanged()
-    ).subscribe(token => {
+    ).subscribe((token: string | null) => {
       if (token === null) {
         this.userStateSubject.next({
           user: null,
@@ -192,6 +193,7 @@ export class UserService {
           error: null,
         });
         this.loading$ = null;
+        localStorage.removeItem('cachedUser');
       } else {
         const current = this.userStateSubject.value;
         if (current.loaded && !current.user) {
@@ -206,7 +208,7 @@ export class UserService {
     });
   }
 
-  userState$ = this.userStateSubject.asObservable().pipe(
+  userState$: Observable<UserState> = this.userStateSubject.asObservable().pipe(
     tap(state => {
       if (!state.loaded && !state.error && !this.loading$) {
         this.loading$ = this.fetchMyself().pipe(
@@ -219,18 +221,37 @@ export class UserService {
   );
 
   private fetchMyself(): Observable<User> {
+    if (!navigator.onLine) {
+      const cachedUser = localStorage.getItem('cachedUser');
+      if (cachedUser) {
+        const user = JSON.parse(cachedUser);
+        this.userStateSubject.next({ user, loaded: true, error: null });
+        return of(user);
+      }
+    }
+
     return this.http.get<User>(`${this.userUrl}/me`).pipe(
-      tap(user => this.userStateSubject.next({user, loaded: true, error: null})),
+      tap(user => {
+        this.userStateSubject.next({ user, loaded: true, error: null });
+        localStorage.setItem('cachedUser', JSON.stringify(user));
+      }),
       catchError(err => {
+        const cachedUser = localStorage.getItem('cachedUser');
+        if (cachedUser) {
+          const user = JSON.parse(cachedUser);
+          this.userStateSubject.next({ user, loaded: true, error: null });
+          return of(user);
+        }
+
         const curr = this.userStateSubject.value;
-        this.userStateSubject.next({user: curr.user, loaded: true, error: err.message});
+        this.userStateSubject.next({ user: curr.user, loaded: true, error: err.message });
         throw err;
       })
     );
   }
 
   public setInitialUser(user: User): void {
-    this.userStateSubject.next({user, loaded: true, error: null});
+    this.userStateSubject.next({ user, loaded: true, error: null });
   }
 
   getCurrentUser(): User | null {
@@ -289,14 +310,14 @@ export class UserService {
       value
     };
     this.http.put<void>(`${this.userUrl}/${userId}/settings`, payload, {
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       responseType: 'text' as 'json'
     }).subscribe(() => {
       const currentState = this.userStateSubject.value;
       if (currentState.user) {
-        const updatedSettings = {...currentState.user.userSettings, [key]: value};
-        const updatedUser = {...currentState.user, userSettings: updatedSettings};
-        this.userStateSubject.next({...currentState, user: updatedUser});
+        const updatedSettings = { ...currentState.user.userSettings, [key]: value };
+        const updatedUser = { ...currentState.user, userSettings: updatedSettings };
+        this.userStateSubject.next({ ...currentState, user: updatedUser });
       }
     });
   }

@@ -103,6 +103,18 @@ export class BookService {
   }
 
   private fetchBooks(): Observable<Book[]> {
+    if (!navigator.onLine) {
+      return this.offlineService.getOfflineBooks().pipe(
+        tap(books => {
+          this.bookStateSubject.next({
+            books: books || [],
+            loaded: true,
+            error: null,
+          });
+        })
+      );
+    }
+
     return this.http.get<Book[]>(this.url).pipe(
       tap(books => {
         this.bookStateSubject.next({
@@ -201,10 +213,16 @@ export class BookService {
   }
 
   getBookSetting(bookId: number): Observable<BookSetting> {
+    if (!navigator.onLine) {
+      return of({} as BookSetting);
+    }
     return this.http.get<BookSetting>(`${this.url}/${bookId}/viewer-setting`);
   }
 
   updateViewerSetting(bookSetting: BookSetting, bookId: number): Observable<void> {
+    if (!navigator.onLine) {
+      return of(void 0);
+    }
     return this.http.put<void>(`${this.url}/${bookId}/viewer-setting`, bookSetting);
   }
 

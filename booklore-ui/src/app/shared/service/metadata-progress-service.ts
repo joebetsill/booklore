@@ -1,11 +1,11 @@
-import {inject, Injectable, OnDestroy} from '@angular/core';
-import {BehaviorSubject, Subject, Subscription} from 'rxjs';
-import {MetadataBatchProgressNotification} from '../model/metadata-batch-progress.model';
-import {MetadataTaskService} from '../../features/book/service/metadata-task';
-import {UserService} from '../../features/settings/user-management/user.service';
-import {filter, take} from 'rxjs/operators';
+import { inject, Injectable, OnDestroy } from '@angular/core';
+import { BehaviorSubject, Subject, Subscription } from 'rxjs';
+import { MetadataBatchProgressNotification } from '../model/metadata-batch-progress.model';
+import { MetadataTaskService } from '../../features/book/service/metadata-task';
+import { UserService } from '../../features/settings/user-management/user.service';
+import { filter, take } from 'rxjs/operators';
 
-@Injectable({providedIn: 'root'})
+@Injectable({ providedIn: 'root' })
 export class MetadataProgressService implements OnDestroy {
   private progressMap = new Map<string, BehaviorSubject<MetadataBatchProgressNotification>>();
 
@@ -23,11 +23,11 @@ export class MetadataProgressService implements OnDestroy {
   constructor() {
     const sub = this.userService.userState$
       .pipe(
-        filter(userState => !!userState?.user),
+        filter((userState: any) => !!userState?.user),
         take(1)
       )
-      .subscribe(userState => {
-        if (!this.hasMetadataPermissions(userState.user)) {
+      .subscribe((userState: any) => {
+        if (!userState || !this.hasMetadataPermissions(userState.user)) {
           return;
         }
         const activeTasksSub = this.metadataTaskService.getActiveTasks().subscribe({
@@ -41,7 +41,7 @@ export class MetadataProgressService implements OnDestroy {
   }
 
   handleIncomingProgress(progress: MetadataBatchProgressNotification): void {
-    const {taskId} = progress;
+    const { taskId } = progress;
 
     if (!this.progressMap.has(taskId)) {
       this.progressMap.set(taskId, new BehaviorSubject(progress));

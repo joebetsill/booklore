@@ -50,8 +50,8 @@ export class AppMenuComponent implements OnInit {
     });
 
     this.userService.userState$.pipe(
-      filter(userState => !!userState?.user && userState.loaded))
-      .subscribe(userState => {
+      filter((userState: any) => !!userState?.user && userState.loaded))
+      .subscribe((userState: any) => {
         if (userState.user?.userSettings.sidebarLibrarySorting) {
           this.librarySortField = this.validateSortField(userState.user.userSettings.sidebarLibrarySorting.field);
           this.librarySortOrder = this.validateSortOrder(userState.user.userSettings.sidebarLibrarySorting.order);
